@@ -1,0 +1,147 @@
+Metadata-Version: 2.4
+Name: viberuntime
+Version: 1.0.0
+Summary: Runtime guardrail for AI-generated Python code. Gates subprocess.run() calls against destructive patterns and network allowlists before execution.
+Author-email: Charon Labs <contact@charonlabs.dev>
+License: MIT
+Project-URL: Homepage, https://github.com/abarabash67-debug/viberuntime
+Project-URL: Repository, https://github.com/abarabash67-debug/viberuntime
+Project-URL: Issues, https://github.com/abarabash67-debug/viberuntime/issues
+Keywords: ai-security,subprocess-guard,shell-guard,runtime-protection,agent-safety,devsecops
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Security
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Provides-Extra: dev
+Requires-Dist: pytest>=7.4; extra == "dev"
+Requires-Dist: pytest-cov>=4.1; extra == "dev"
+Dynamic: license-file
+
+# viberuntime
+
+Runtime guardrail for AI-generated Python code. Gates every `subprocess.run()` call against a destructive-pattern blocklist and a network allowlist — before the OS sees the command.
+
+[![PyPI version](https://img.shields.io/badge/pypi-v1.0.0-blue)](https://pypi.org/project/viberuntime/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+## Why
+
+AI-generated code runs shell commands. Most of the time those commands are harmless. But when an agent reads a scraped page, a GitHub issue, or a third-party API response and decides to "fix dependencies" with `curl https://... | bash` — you need a gate, not a prayer.
+
+`viberuntime` is that gate. It sits between your code and the OS, and refuses to execute commands that match known destructive patterns or reach hosts that aren't on your allowlist.
+
+## Install
+
+```bash
+pip install viberuntime
+```
+
+No dependencies. Python 3.9+.
+
+## Usage
+
+Replace `subprocess.run()` with `viberuntime.run()`:
+
+```python
+from viberuntime import run, VibeRuntimeBlocked
+
+try:
+    result = run(
+        "ls -la",
+        allowed_hosts={"github.com", "pypi.org"},
+    )
+    print(result.stdout)
+except VibeRuntimeBlocked as exc:
+    print(f"Blocked: [{exc.signature}] {exc.reason}")
+```
+
+## What it blocks
+
+| Pattern | Signature |
+|---|---|
+| Recursive deletion outside the project root | `RECURSIVE_DELETE_OUTSIDE_ROOT` |
+| `curl ... \| bash`, `wget ... \| sh` | `DOWNLOAD_TO_SHELL_PIPE` |
+| Base64-decoded execution | `BASE64_EXEC` |
+| Port scanners (`nmap`, `masscan`, `zmap`) | `ROGUE_TOOL` |
+| Brute-force tools (`hydra`, `medusa`) | `ROGUE_TOOL` |
+| `mkfs`, `dd if=/dev/...` | `DISK_DESTROY` |
+| Fork bomb shape | `FORK_BOMB` |
+| `chmod -R 777 /etc`, `/usr`, etc. | `CHMOD_SYSTEM` |
+| Overwrite of `/etc/passwd`, `/etc/shadow` | `OVERWRITE_SYSTEM` |
+| Host not on the network allowlist | `NETWORK_HOST_NOT_ALLOWED` |
+
+## Audit trail
+
+Every gated action is appended to `.viberuntime-audit.log`:
+
+```json
+{
+  "block_hash": "sha256:e3b0c44298fc...",
+  "timestamp": "2026-10-02T12:00:00+00:00",
+  "verdict": "BLOCKED",
+  "signature": "DOWNLOAD_TO_SHELL_PIPE",
+  "reason": "Download-piped-to-shell pattern detected.",
+  "auditor": "viberuntime v1.0.0"
+}
+```
+
+Read entries programmatically:
+
+```python
+from viberuntime import read_entries
+
+for entry in read_entries():
+    print(entry["timestamp"], entry["verdict"], entry["signature"])
+```
+
+The hash is a fingerprint — two identical commands produce the same hash, and the raw command string is never stored beyond the signature. Secrets and PII never land in the audit log.
+
+## Configuration
+
+```python
+from viberuntime import run
+
+run(
+    command="echo hello",
+    allowed_hosts={"github.com", "pypi.org", "npmjs.com"},
+    project_root="/home/user/myapp",
+    audit_file="/var/log/viberuntime.log",
+    shell=True,
+    timeout=30.0,
+    check=False,
+)
+```
+
+- `allowed_hosts` — network allowlist. Defaults to `github.com`, `pypi.org`, `files.pythonhosted.org`, `npmjs.com`, `registry.npmjs.org`.
+- `project_root` — project root path. `rm -rf` inside it is allowed; outside is blocked.
+- `audit_file` — where the audit trail is written. Defaults to `.viberuntime-audit.log`.
+
+## What it does NOT do
+
+- It is not a replacement for OS-level sandboxing, container isolation, or seccomp.
+- It does not analyze the correctness of a command — only its safety.
+- It does not run commands for you — it gates them.
+
+`viberuntime` is a **runtime advisory layer**. Use it alongside containers, not instead of them.
+
+## Development
+
+```bash
+git clone https://github.com/abarabash67-debug/viberuntime
+cd viberuntime
+pip install -e ".[dev]"
+pytest
+```
+
+## License
+
+MIT — see [LICENSE](LICENSE).

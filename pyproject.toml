@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "viberuntime"
+version = "1.0.0"
+description = "Runtime guardrail for AI-generated Python code. Gates subprocess.run() calls against destructive patterns and network allowlists before execution."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "Charon Labs", email = "contact@charonlabs.dev" }
+]
+keywords = [
+    "ai-security",
+    "subprocess-guard",
+    "shell-guard",
+    "runtime-protection",
+    "agent-safety",
+    "devsecops",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/abarabash67-debug/viberuntime"
+Repository = "https://github.com/abarabash67-debug/viberuntime"
+Issues = "https://github.com/abarabash67-debug/viberuntime/issues"
+Agensi = "https://www.agensi.io/creators/creator-440"
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "pytest-cov>=4.1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
